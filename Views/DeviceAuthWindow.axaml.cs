@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Interactivity;
 using TraeCheckin;
 
@@ -9,8 +8,11 @@ namespace TraeTools.Views;
 /// GitHub 设备码授权窗口。申请设备码→展示授权码→打开授权页→轮询授权结果，
 /// ShowDialog&lt;bool&gt; 返回是否授权成功；成功后通过 <see cref="AccessToken"/> 取回 token。
 /// </summary>
-public partial class DeviceAuthWindow : Window
+public partial class DeviceAuthWindow : UserControl, IDialogView
 {
+    /// <summary>对话框标题（桌面端由 DialogHostWindow 读取，作为宿主窗口标题）。</summary>
+    public string DialogTitle => "GitHub 授权";
+
     private readonly GitHubApiClient _api = null!;
     private GitHubDeviceCode? _code;
     private bool _polling;
@@ -57,8 +59,9 @@ public partial class DeviceAuthWindow : Window
     private void OpenPage(GitHubDeviceCode code)
     {
         
-        try { Process.Start(new ProcessStartInfo(code.VerificationUri) { UseShellExecute = true }); }
-        catch (Exception ex) { StatusText.Text = "自动打开浏览器失败，请手动访问：" + code.VerificationUri + "（" + ex.Message + "）"; }
+        // 跨平台打开：Android 走 Intent（Activity → Application → 选择器 三级回退），失败会写日志
+        if (!TraeTools.Platform.BrowserLauncher.Open(code.VerificationUri))
+            StatusText.Text = "自动打开浏览器失败，请手动访问：" + code.VerificationUri;
     }
 
     private void OnOpenPageClick(object? sender, RoutedEventArgs e)
@@ -95,7 +98,7 @@ public partial class DeviceAuthWindow : Window
                 AccessToken = token;
                 _done = true;
                 StatusText.Text = "授权成功 ✓";
-                Close(true);
+                OverlayDialog.CloseDialog(this, true);
                 return;
             }
             if (state == DeviceAuthState.Failed)
@@ -115,7 +118,7 @@ public partial class DeviceAuthWindow : Window
     private void OnCancelClick(object? sender, RoutedEventArgs e)
     {
         _done = true;
-        Close(false);
+        OverlayDialog.CloseDialog(this, false);
     }
 }
 

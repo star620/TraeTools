@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Avalonia.Input.Platform;
@@ -310,7 +310,7 @@ public partial class SettingsViewModel : ViewModelBase
                 "用于多账号被风控（-9074 参与用户太多）时批量规避。\n" +
                 "更换后云端部署需重新「云端部署」同步新的 TRAE_DEVICE_ID*。\n\n是否继续？",
                 "全部更换", "取消");
-            bool ok = owner != null ? await ask.ShowDialog<bool>(owner) : false;
+            bool ok = owner != null ? await OverlayDialog.ShowAsync<bool>(ask, owner) : false;
             if (!ok)
             {
                 PushStatus = "已取消";
@@ -481,7 +481,7 @@ public partial class SettingsViewModel : ViewModelBase
             cfg.Save();
 
             var dlg = new Views.LoginWindow(acc);
-            bool ok = await dlg.ShowDialog<bool>(owner);
+            bool ok = await OverlayDialog.ShowAsync<bool>(dlg, owner);
             if (ok)
             {
                 // 同一手机号判重（JWT data.id 跨会话恒定）：重复则拒绝保存本次登录
@@ -617,7 +617,7 @@ public partial class SettingsViewModel : ViewModelBase
             "重置用户协议",
             "将清除「用户协议与免责声明」的同意记录并退出软件。\n下次启动时会要求你重新阅读并同意。\n\n确定重置并退出？",
             "重置并退出", "取消");
-        bool ok = owner != null ? await ask.ShowDialog<bool>(owner) : false;
+        bool ok = owner != null ? await OverlayDialog.ShowAsync<bool>(ask, owner) : false;
         if (!ok)
         {
             PushStatus = "已取消重置";
@@ -673,7 +673,7 @@ public partial class SettingsViewModel : ViewModelBase
             "  · 所有个性化设置\n\n" +
             "重置后软件将退出，重新启动后回到初始状态。\n\n确定要继续吗？",
             "继续", "取消");
-        bool go1 = owner != null ? await ask1.ShowDialog<bool>(owner) : false;
+        bool go1 = owner != null ? await OverlayDialog.ShowAsync<bool>(ask1, owner) : false;
         if (!go1) { PushStatus = "已取消重置"; return; }
 
         // ---- 第二次确认：最终警告 ----
@@ -681,7 +681,7 @@ public partial class SettingsViewModel : ViewModelBase
             "最终确认",
             "最后警告：此操作不可撤销！\n\n所有账号数据、签到记录、设置将被永久删除。\n\n确认执行重置？",
             "确认重置", "取消");
-        bool go2 = owner != null ? await ask2.ShowDialog<bool>(owner) : false;
+        bool go2 = owner != null ? await OverlayDialog.ShowAsync<bool>(ask2, owner) : false;
         if (!go2) { PushStatus = "已取消重置"; return; }
 
         // ---- 执行清理 ----
@@ -794,12 +794,33 @@ public partial class SettingsViewModel : ViewModelBase
                 return;
             }
 
+#if ANDROID
+            // Android 无法像桌面端那样替换正在运行的 exe（Zip 整包 + 后台脚本），
+            // 改为引导用户到 Release 页下载 APK 覆盖安装。
+            var goDownload = await OverlayDialog.ShowAsync<bool>(
+                new PromptWindow("发现新版本",
+                    $"发现新版本 {rel.Tag}（当前 {AppVersion}，约 {Math.Max(1, (long)(rel.Size / 1048576.0))} MB）。\n\n"
+                    + "手机端不支持应用内自动安装，是否现在打开下载页？",
+                    "打开下载页", "取消"),
+                UiHost.MainWindow);
+            if (goDownload)
+            {
+                TraeTools.Platform.BrowserLauncher.Open(
+                    $"https://github.com/{UpdaterService.Repo}/releases/tag/{rel.Tag}");
+                PushStatus = "已打开下载页，请下载 APK 后覆盖安装";
+            }
+            else
+            {
+                PushStatus = "已取消更新";
+            }
+            return;
+#else
             PushStatus = $"发现新版本 {rel.Tag}";
             var owner = UiHost.MainWindow;
             var ask = new PromptWindow("发现新版本",
                 $"发现新版本 {rel.Tag}\n（当前 {AppVersion}，约 {Math.Max(1, (long)(rel.Size / 1048576.0))} MB）\n\n是否下载并自动安装？",
                 "下载并安装", "取消");
-            bool ok = owner != null ? await ask.ShowDialog<bool>(owner) : false;
+            bool ok = owner != null ? await OverlayDialog.ShowAsync<bool>(ask, owner) : false;
             if (!ok)
             {
                 PushStatus = "已取消更新";
@@ -857,6 +878,7 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 PushStatus = "更新失败：" + ex.Message;
             }
+#endif
         }
         catch (Exception ex)
         {

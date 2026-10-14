@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<resources>
+  <style name="MyTheme">
+  </style>
+  <!-- Avalonia 的 Android Activity 继承自 AppCompatActivity，主题必须是 AppCompat 系
+       （Avalonia.Android 已传递依赖 Xamarin.AndroidX.AppCompat，无需额外引用）。
+       界面本体由 Skia 绘制，此处只影响窗口标题栏与启动时的窗口底色。 -->
+  <style name="MyTheme.NoActionBar" parent="@style/Theme.AppCompat.DayNight.NoActionBar">
+    <item name="android:windowActionBar">false</item>
+    <item name="android:windowBackground">@color/splash_background</item>
+    <item name="android:windowNoTitle">true</item>
+  </style>
+</resources>

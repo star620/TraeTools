@@ -1,10 +1,9 @@
-﻿<Window xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="620" d:DesignHeight="600"
         x:Class="TraeTools.Views.EulaWindow"
-        Title="TRAETOOLS 最终用户许可协议"
         Width="620" Height="600"
         MinWidth="560" MinHeight="520"
         Background="White"
@@ -81,6 +80,4 @@ TRAETOOLS 最终用户许可协议（EULA）
             </StackPanel>
         </Border>
     </Grid>
-</Window>
-
-
+</UserControl>

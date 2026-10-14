@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using TraeTools.Services.Json;
 
@@ -7,13 +5,15 @@ namespace TraeCheckin;
 
 /// <summary>
 /// 本地配置：存储 token、设备号、自动签到设置。
-/// 保存到 %APPDATA%\TraeTools\config.json。
-/// 敏感字段（Token/Session/GitHubToken/DeviceId）以当前 Windows 用户 DPAPI 加密落盘，
-/// 加载时解密回内存；旧版明文在首次加载时自动迁移加密。
+/// 保存到配置根目录下的 config.json（Windows: %APPDATA%\TraeTools；Android: 应用私有目录）。
+/// 敏感字段（Token/Session/GitHubToken/DeviceId）以本平台的原生密钥加密落盘
+/// （Windows=DPAPI，Android=Keystore，见 TraeTools.Platform.Secrets），加载时解密回内存；
+/// 旧版明文在首次加载时自动迁移加密。
 /// </summary>
 public class AppConfig
 {
-    /// <summary>敏感字段加密版本标记："dpapi-v1"=已用 DPAPI 加密；null=旧版明文（等待迁移）。</summary>
+    /// <summary>敏感字段加密版本标记："dpapi-v1"=Windows DPAPI、"and-v1"=Android Keystore；
+    /// null=旧版明文（等待迁移）。两平台标记都会被识别，跨平台拷贝时解密失败由各字段兜底处理。</summary>
     public string? SecretsVaultVersion { get; set; }
     public string? Token { get; set; }
     /// <summary>X-Cloudide-Session 会话 Cookie 值（约 14 天有效），用于 token 失效时静默换新。</summary>
@@ -62,10 +62,10 @@ public class AppConfig
                 var cfg = AppJsonIndented.Deserialize<AppConfig>(json);
                 if (cfg != null)
                 {
-                    // DPAPI 加密迁移：已是 dpapi-v1 则解密回内存使用；旧明文标记版本，稍后统一加密落盘
-                    var needSeal = cfg.SecretsVaultVersion != SecretVaultVersionV1;
+                    // 加密迁移：已是本平台的密文版本则解密回内存使用；旧明文标记版本，稍后统一加密落盘
+                    var needSeal = cfg.SecretsVaultVersion != TraeTools.Platform.Secrets.CurrentVaultVersion;
                     UnsealSecrets(cfg);
-                    cfg.SecretsVaultVersion = SecretVaultVersionV1;
+                    cfg.SecretsVaultVersion = TraeTools.Platform.Secrets.CurrentVaultVersion;
 
                     // 多账号迁移：旧单账号转成 Accounts[0]
                     if (TryMigrateLegacy(cfg))
@@ -171,22 +171,21 @@ public class AppConfig
         catch { /* 保存失败（含 DPAPI 异常）时保留磁盘旧文件，下次启动仍可读取 */ }
     }
 
-    /// <summary>敏感字段加密版本号。</summary>
-    private const string SecretVaultVersionV1 = "dpapi-v1";
-
-    /// <summary>生成一份敏感字段（Token/Session/GitHubToken/DeviceId）已 DPAPI 加密的副本。</summary>
+    /// <summary>生成一份敏感字段（Token/Session/GitHubToken/DeviceId）已平台加密的副本。</summary>
     private AppConfig CloneForStorage()
     {
         return new AppConfig
         {
-            SecretsVaultVersion = SecretVaultVersionV1,
+            SecretsVaultVersion = TraeTools.Platform.Secrets.CurrentVaultVersion,
             Token = EncryptSecret(Token),
             Session = EncryptSecret(Session),
             TokenUpdatedAt = TokenUpdatedAt,
             GitHubToken = EncryptSecret(GitHubToken),
             GitHubLogin = GitHubLogin,
             FeishuWebhook = FeishuWebhook,
-            DeviceId = EncryptSecret(DeviceId),
+            // DeviceId 非空类型：加密失败（极端平台异常）时退回明文，避免设备号被静默清掉
+            // 后在下次启动被重新生成，导致风控把新设备号当陌生设备
+            DeviceId = EncryptSecret(DeviceId) ?? DeviceId,
             AutoCheckinEnabled = AutoCheckinEnabled,
             AutoCheckinTime = AutoCheckinTime,
             CheckinIntervalSeconds = CheckinIntervalSeconds,
@@ -206,7 +205,7 @@ public class AppConfig
                 Name = a.Name,
                 Token = EncryptSecret(a.Token),
                 Session = EncryptSecret(a.Session),
-                DeviceId = EncryptSecret(a.DeviceId),
+                DeviceId = EncryptSecret(a.DeviceId) ?? a.DeviceId,
                 AccountUid = a.AccountUid,
                 TokenUpdatedAt = a.TokenUpdatedAt,
                 LastCheckinDate = a.LastCheckinDate,
@@ -221,10 +220,12 @@ public class AppConfig
         };
     }
 
-    /// <summary>已加密配置加载后：解密敏感字段回内存（仅 dpapi-v1 生效；旧明文保持原样等迁移）。</summary>
+    /// <summary>已加密配置加载后：解密敏感字段回内存（仅已加密版本生效；旧明文保持原样等迁移）。</summary>
     private static void UnsealSecrets(AppConfig cfg)
     {
-        if (cfg.SecretsVaultVersion != SecretVaultVersionV1) return;
+        // 两个平台的版本标记都认：配置文件可能被跨平台拷贝，此时解密必然失败，
+        // 交由各字段的兜底策略处理（Token → null → 重新登录），而不是把密文当明文继续用。
+        if (!TraeTools.Platform.Secrets.IsKnownVaultVersion(cfg.SecretsVaultVersion)) return;
         cfg.Token = DecryptSecret(cfg.Token);
         cfg.Session = DecryptSecret(cfg.Session);
         cfg.GitHubToken = DecryptSecret(cfg.GitHubToken);
@@ -239,23 +240,10 @@ public class AppConfig
         }
     }
 
-    /// <summary>DPAPI 加密（当前 Windows 用户作用域）。保护失败抛异常，由调用方兜底（保留旧文件）。</summary>
-    private static string? EncryptSecret(string? plain)
-    {
-        if (string.IsNullOrEmpty(plain)) return plain;
-        var bytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(plain), null, DataProtectionScope.CurrentUser);
-        return Convert.ToBase64String(bytes);
-    }
+    /// <summary>平台加密（Windows=DPAPI / Android=Keystore，见 TraeTools.Platform.Secrets）。
+    /// 加密失败返回 null，由调用方兜底（保留旧文件）。</summary>
+    private static string? EncryptSecret(string? plain) => TraeTools.Platform.Secrets.Protect(plain);
 
-    /// <summary>DPAPI 解密；失败（如换 Windows 用户/重装系统）返回 null，触发重新登录。</summary>
-    private static string? DecryptSecret(string? enc)
-    {
-        if (string.IsNullOrEmpty(enc)) return enc;
-        try
-        {
-            var bytes = ProtectedData.Unprotect(Convert.FromBase64String(enc), null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(bytes);
-        }
-        catch { return null; }
-    }
+    /// <summary>平台解密；失败（换 Windows 用户/重装系统/跨平台拷贝配置）返回 null，触发重新登录。</summary>
+    private static string? DecryptSecret(string? enc) => TraeTools.Platform.Secrets.Unprotect(enc);
 }

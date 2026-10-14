@@ -1,13 +1,15 @@
 ﻿using System;
-using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
 namespace TraeTools.Views;
 
 /// <summary>粘贴 GitHub PAT 的输入窗口：返回 true 表示已提交有效文本（访问 PatText 获取）。</summary>
-public partial class PatInputWindow : Window
+public partial class PatInputWindow : UserControl, IDialogView
 {
+    /// <summary>对话框标题（桌面端由 DialogHostWindow 读取，作为宿主窗口标题）。</summary>
+    public string DialogTitle => "粘贴 GitHub Token（PAT）";
+
     public string? PatText { get; private set; }
 
     public PatInputWindow()
@@ -17,8 +19,8 @@ public partial class PatInputWindow : Window
 
     private void OnOpenGithubClick(object? sender, RoutedEventArgs e)
     {
-        try { Process.Start(new ProcessStartInfo("https://github.com/settings/personal-access-tokens/new") { UseShellExecute = true }); }
-        catch { /* 打开失败忽略 */ }
+        // 走跨平台封装：Android 用 Intent 拉起系统浏览器，失败会写日志（category=browser）
+        TraeTools.Platform.BrowserLauncher.Open("https://github.com/settings/personal-access-tokens/new");
     }
 
     private void OnOkClick(object? sender, RoutedEventArgs e)
@@ -31,8 +33,8 @@ public partial class PatInputWindow : Window
             return;
         }
         PatText = value;
-        Close(true);
+        OverlayDialog.CloseDialog(this, true);
     }
 
-    private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(false);
+    private void OnCancelClick(object? sender, RoutedEventArgs e) => OverlayDialog.CloseDialog(this, false);
 }

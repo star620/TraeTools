@@ -30,14 +30,16 @@ jobs:
       # libsodium 必须与 exe 同目录，只替换 exe 会得到"缺 DLL 打不开"的残废程序。
       # 应用内更新器（UpdaterService）现在下载 `TraeTools-win-x64.zip` → 校验 SHA-256 → 解包 →
       # 整套文件原子替换 → 重启；zip 压缩也抵消了 AOT 原生库带来的体积增长。
+      # ⚠️ 主程序是双目标（net10.0-windows;net10.0-android），必须用 -f 限定框架：
+      # 否则 -r win-x64 会渗入 android TFM 的还原，报 NU1102（找不到 Mono 的 win-x64 运行时包）。
       - name: Publish main (NativeAOT directory form)
-        run: dotnet publish TraeTools.csproj -c Release -r win-x64 --self-contained true -p:EnableAot=true -o publish_aot
+        run: dotnet publish TraeTools.csproj -c Release -f net10.0-windows -r win-x64 --self-contained true -p:EnableAot=true -o publish_aot
 
       # 兼容引导包：历史客户端内的旧更新器只会下载名为 `TraeTools.exe` 的资产并替换自身。
       # 提供单文件自包含版（csproj 已开 PublishTrimmed=full，约 23MB），老客户端可一次性升到新版，
       # 之后其内置的新更新器会改走上面的 zip 整包。
       - name: Publish main (single-file bootstrap, legacy updater compatible)
-        run: dotnet publish TraeTools.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
+        run: dotnet publish TraeTools.csproj -c Release -f net10.0-windows -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 
       # P2-1：登录宿主（WinForms + WebView2）是独立进程，不参与主程序的 NativeAOT，
       # 因此单独发布并随压缩包/Release 一起分发；缺失时主程序自动回退到"手动粘贴 Token"。

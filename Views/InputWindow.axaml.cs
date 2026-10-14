@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 
@@ -8,8 +8,11 @@ namespace TraeTools.Views;
 /// 通用单行文本输入窗口。ShowDialog&lt;string&gt; 返回：true 路径关窗时返回输入文本（trim 后），
 /// 取消返回 null。
 /// </summary>
-public partial class InputWindow : Window
+public partial class InputWindow : UserControl, IDialogView
 {
+    /// <summary>对话框标题（桌面端由 DialogHostWindow 读取，作为宿主窗口标题）。</summary>
+    public string DialogTitle { get; private set; } = "输入";
+
     public string? ResultText { get; private set; }
 
     public InputWindow()
@@ -24,6 +27,7 @@ public partial class InputWindow : Window
         : this()
     {
         TitleText.Text = title;
+        DialogTitle = title;
         MessageText.Text = message;
         InputBox.PlaceholderText = placeholder;
     }
@@ -37,11 +41,11 @@ public partial class InputWindow : Window
             return;
         }
         ResultText = value;
-        Close(ResultText);
+        OverlayDialog.CloseDialog(this, ResultText);
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e)
-        => Close(null);
+        => OverlayDialog.CloseDialog(this, null);
 
     private void OnInputKeyDown(object? sender, KeyEventArgs e)
     {

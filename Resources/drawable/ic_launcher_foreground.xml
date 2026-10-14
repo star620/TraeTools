@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- 字母 T（TraeTools 首字母），白色，位于 adaptive icon 安全区中心 -->
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M40,32 h28 v9 h-9 v30 h-10 v-30 h-9 z" />
+  <!-- 右下角对勾（签到） -->
+  <path
+      android:fillColor="#38BDF8"
+      android:pathData="M62,62 l6,6 l12,-14 l6,6 l-18,20 l-12,-12 z" />
+</vector>

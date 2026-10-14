@@ -1,12 +1,10 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="520"
         x:Class="TraeTools.Views.PatInputWindow"
-        Title="粘贴 GitHub Token（PAT）"
-        Width="520" Height="330" CanResize="False"
-        WindowStartupLocation="CenterOwner"
+        Width="520" Height="330"
         Background="White"
         FontFamily="Microsoft YaHei UI,Segoe UI">
     <Grid RowDefinitions="Auto,*,Auto" Background="White">
@@ -34,5 +32,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Window>
-
+</UserControl>

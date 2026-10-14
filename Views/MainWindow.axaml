@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:TraeTools.ViewModels"
+        xmlns:views="using:TraeTools.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="720"
@@ -10,84 +11,15 @@
         Width="1100" Height="720"
         MinWidth="940" MinHeight="600"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource ContentBgBrush}"
+        Background="{DynamicResource ContentBgBrush}"
         FontFamily="Inter,Microsoft YaHei UI,Segoe UI">
 
     <Design.DataContext>
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="190" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <!-- ============ Sidebar ============ -->
-        <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}">
-            <Grid RowDefinitions="Auto,*,Auto">
-                <!-- Brand area -->
-                <StackPanel Grid.Row="0" Margin="20,26,20,18">
-                    <TextBlock Text="TraeTools" Foreground="White" FontSize="22" FontWeight="Bold" />
-                    <TextBlock Text="签到 · 账号切换 · 用量统计" Foreground="#94A3B8" FontSize="12" Margin="0,4,0,0" />
-                </StackPanel>
-
-                <!-- Nav items -->
-                <StackPanel Grid.Row="1" Margin="12,8" Spacing="4">
-                    <Button Classes="nav-item" Classes.nav-item-active="{Binding IsDashboardActive}"
-                            Command="{Binding NavigateCommand}" CommandParameter="dashboard">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="▦" FontSize="14" Width="20" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White" />
-                            <TextBlock Text="仪表盘" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="nav-item" Classes.nav-item-active="{Binding IsUsageActive}"
-                            Command="{Binding NavigateCommand}" CommandParameter="usage">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Σ" FontSize="14" Width="20" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White" />
-                            <TextBlock Text="用量统计" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="nav-item" Classes.nav-item-active="{Binding IsCheckinActive}"
-                            Command="{Binding NavigateCommand}" CommandParameter="checkin">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="✓" FontSize="14" Width="20" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White" />
-                            <TextBlock Text="每日签到" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="nav-item" Classes.nav-item-active="{Binding IsSwitchActive}"
-                            Command="{Binding NavigateCommand}" CommandParameter="switch">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⇄" FontSize="14" Width="20" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White" />
-                            <TextBlock Text="账号切换" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="nav-item" Classes.nav-item-active="{Binding IsCloudActive}"
-                            Command="{Binding NavigateCommand}" CommandParameter="cloud">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="☁" FontSize="14" Width="20" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White" />
-                            <TextBlock Text="云端签到" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="nav-item" Classes.nav-item-active="{Binding IsSettingsActive}"
-                            Command="{Binding NavigateCommand}" CommandParameter="settings">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚙" FontSize="14" Width="20" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White" />
-                            <TextBlock Text="设置" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-
-                <!-- Version footer：动态展示版本，与"关于/更新检查"同源，避免写死导致错位 -->
-                <TextBlock Grid.Row="2" Text="{Binding AppVersion}"
-                           Foreground="#64748B" FontSize="11"
-                           Margin="20,12" />
-            </Grid>
-        </Border>
-
-        <!-- ============ Content Area ============ -->
-        <Border Grid.Column="1" Background="{StaticResource ContentBgBrush}" Padding="28,32">
-            <ContentControl Content="{Binding CurrentPage}" />
-        </Border>
-    </Grid>
+    <!-- 桌面端外壳（仅 Windows）：
+         主界面本体是 MainView（UserControl，Android 单视图平台复用同一份），
+         本窗口只负责桌面专有的托盘、关闭即最小化等行为，避免两平台各维护一套界面。 -->
+    <views:MainView />
 </Window>

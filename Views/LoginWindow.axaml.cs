@@ -1,5 +1,4 @@
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.IO;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -10,11 +9,15 @@ using TraeTools.ViewModels;
 namespace TraeTools.Views;
 
 /// <summary>
-/// 登录窗口：优先使用内嵌 WebView2 自动登录（自动读取 token + session），
-/// 也保留手动粘贴 Cloud-IDE-Token 的备选方案。
+/// 登录对话框（UserControl，双平台）。
+/// 桌面端：优先用独立宿主进程里的内嵌 WebView2 自动登录（自动读取 token + session），
+/// 找不到宿主或 Android 端时，走手动粘贴 Cloud-IDE-Token / Session 的通道。
 /// </summary>
-public partial class LoginWindow : Window
+public partial class LoginWindow : UserControl, IDialogView
 {
+    /// <summary>对话框标题（桌面端由 DialogHostWindow 读取作为窗口标题）。</summary>
+    public string DialogTitle => "登录 TRAE 账号";
+
     private readonly TraeAccount? _account;
     private bool _busy;
 
@@ -29,15 +32,16 @@ public partial class LoginWindow : Window
         _account = account;
     }
 
-    /// <summary>内嵌 WebView2 自动登录：独立 STA 线程宿主，自动读取 Cloud-IDE-Token 与 X-Cloudide-Session。</summary>
+    /// <summary>内嵌 WebView2 自动登录：由独立宿主进程完成，自动读取 Cloud-IDE-Token 与 X-Cloudide-Session。</summary>
     private async void OnAutoLoginClick(object? sender, RoutedEventArgs e)
     {
+#if ANDROID
+        // Android 上不存在 WebView2 宿主进程：直接引导用户走手动方案（下方「手动粘贴」）。
+        AutoStatus.Text = "手机端请使用下方「手动粘贴」：在电脑浏览器登录 www.trae.cn 后，"
+                        + "从开发者工具复制 Cloud-IDE-Token / X-Cloudide-Session 粘贴到下面。";
+        await System.Threading.Tasks.Task.CompletedTask;
+#else
         if (_busy || _account == null) return;
-        if (string.IsNullOrEmpty(_account.Token))
-        {
-            // 首次登录：为账号准备独立的 WebView2 用户数据目录（账号间登录态隔离）
-            _ = _account;
-        }
 
         // P2-1：内嵌浏览器已拆到独立宿主进程（TraeTools.LoginHost.exe），主程序不含 WinForms/WebView2。
         // 找不到宿主（未随程序分发）时明确提示改用下方手动粘贴方案。
@@ -70,7 +74,7 @@ public partial class LoginWindow : Window
             var uid = TokenUtils.ParseAccountUid(result.Token);
             if (!string.IsNullOrEmpty(uid)) _account.AccountUid = uid;
             MainViewModel.AppConfig?.Save();
-            Close(true);
+            OverlayDialog.CloseDialog(this, true);
         }
         catch (Exception ex)
         {
@@ -80,13 +84,11 @@ public partial class LoginWindow : Window
         {
             _busy = false;
         }
+#endif
     }
 
     private void OnOpenBrowserClick(object? sender, RoutedEventArgs e)
-    {
-        try { Process.Start(new ProcessStartInfo("https://www.trae.cn") { UseShellExecute = true }); }
-        catch { /* 打开失败忽略 */ }
-    }
+        => TraeTools.Platform.BrowserLauncher.Open("https://www.trae.cn");
 
     private void OnSaveClick(object? sender, RoutedEventArgs e)
     {
@@ -112,8 +114,9 @@ public partial class LoginWindow : Window
         var uid = TokenUtils.ParseAccountUid(pasted);
         if (!string.IsNullOrEmpty(uid)) _account.AccountUid = uid;
         MainViewModel.AppConfig?.Save();
-        Close(true);
+        OverlayDialog.CloseDialog(this, true);
     }
 
-    private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(false);
+    private void OnCancelClick(object? sender, RoutedEventArgs e)
+        => OverlayDialog.CloseDialog(this, false);
 }

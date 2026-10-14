@@ -1,0 +1,132 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TraeTools.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="820"
+             x:Class="TraeTools.Views.MainView"
+             x:DataType="vm:MainViewModel"
+             Background="{DynamicResource ContentBgBrush}"
+             FontFamily="Inter,Microsoft YaHei UI,Segoe UI">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <!-- 双平台主视图（UserControl）。
+         ⚠️ 关键：Android 是 Avalonia 单视图平台，new Window() 会在
+         Avalonia.Android.WindowingPlatformStub.CreateWindow() 抛 NotSupportedException，
+         因此根视图必须是 UserControl（不是 Window）；Windows 端由 MainWindow（Window）包一层承载。
+         这里放两平台共享的部分：导航条、内容区、覆盖层对话框宿主、自动签到定时器、首次启动 EULA。 -->
+    <UserControl.Styles>
+        <!-- 导航条上的紧凑标签：比侧边栏版 nav-item 更窄，便于横向排列 6 个入口 -->
+        <Style Selector="Button.tab-item">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSubBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style Selector="Button.tab-item:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22FFFFFF" />
+            <Setter Property="TextElement.Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.tab-item-active">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- ===== 顶栏：品牌 + 版本（版本与「关于/更新检查」同源，避免写死导致错位） ===== -->
+        <Border Grid.Row="0" Background="{DynamicResource SidebarBgBrush}" Padding="16,14,16,8">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="TraeTools" Foreground="White" FontSize="19" FontWeight="Bold" />
+                    <TextBlock Text="签到 · 账号切换 · 用量统计" Foreground="#94A3B8" FontSize="11" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding AppVersion}" VerticalAlignment="Center"
+                           Foreground="#64748B" FontSize="11" />
+            </Grid>
+        </Border>
+
+        <!-- ===== 导航条：横向可滚动，窄屏（手机）也能完整点到 6 个入口 ===== -->
+        <ScrollViewer Grid.Row="1" Background="{DynamicResource SidebarBgBrush}"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Horizontal" Spacing="6" Margin="12,0,12,10">
+                <Button Classes="tab-item" Classes.tab-item-active="{Binding IsDashboardActive}"
+                        Command="{Binding NavigateCommand}" CommandParameter="dashboard">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="▦" VerticalAlignment="Center" Foreground="White" />
+                        <TextBlock Text="仪表盘" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="tab-item" Classes.tab-item-active="{Binding IsUsageActive}"
+                        Command="{Binding NavigateCommand}" CommandParameter="usage">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Σ" VerticalAlignment="Center" Foreground="White" />
+                        <TextBlock Text="用量统计" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="tab-item" Classes.tab-item-active="{Binding IsCheckinActive}"
+                        Command="{Binding NavigateCommand}" CommandParameter="checkin">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="✓" VerticalAlignment="Center" Foreground="White" />
+                        <TextBlock Text="每日签到" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="tab-item" Classes.tab-item-active="{Binding IsSwitchActive}"
+                        Command="{Binding NavigateCommand}" CommandParameter="switch">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="⇄" VerticalAlignment="Center" Foreground="White" />
+                        <TextBlock Text="账号切换" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="tab-item" Classes.tab-item-active="{Binding IsCloudActive}"
+                        Command="{Binding NavigateCommand}" CommandParameter="cloud">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="☁" VerticalAlignment="Center" Foreground="White" />
+                        <TextBlock Text="云端签到" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="tab-item" Classes.tab-item-active="{Binding IsSettingsActive}"
+                        Command="{Binding NavigateCommand}" CommandParameter="settings">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="⚙" VerticalAlignment="Center" Foreground="White" />
+                        <TextBlock Text="设置" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ===== 内容区：由 ViewLocator 按 CurrentPage 类型解析出对应视图 ===== -->
+        <Border Grid.Row="2" Background="{DynamicResource ContentBgBrush}" Padding="16">
+            <ContentControl Content="{Binding CurrentPage}" />
+        </Border>
+
+        <!-- ===== Overlay 对话框宿主（必须跨满整个 Grid） =====
+             Android 单视图平台无法创建 Window，所有对话框都以 UserControl 形式借用此覆盖层呈现；
+             桌面端不使用（走 DialogHostWindow）。 -->
+        <Panel x:Name="OverlayRoot" Grid.Row="0" Grid.RowSpan="3"
+               IsVisible="False" ZIndex="999">
+            <Border Background="#88000000" />
+            <Border HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                    Margin="16,0" MaxWidth="620"
+                    Background="{DynamicResource CardBgBrush}" CornerRadius="12"
+                    BorderBrush="{DynamicResource BorderBrushKey}" BorderThickness="1"
+                    ClipToBounds="True">
+                <ScrollViewer MaxHeight="620">
+                    <ContentPresenter x:Name="OverlayContent" Margin="4" />
+                </ScrollViewer>
+            </Border>
+        </Panel>
+    </Grid>
+</UserControl>

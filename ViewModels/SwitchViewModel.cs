@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -496,7 +496,7 @@ public partial class SwitchViewModel : ViewModelBase
                 "建档新账号",
                 "账号列表为空。\n请为当前登录的 Trae 客户输入一个账号名称（用于区分多个账号的登录态备份，如「主号 / 小号」）。已删除的账号如需恢复，用原来的名称即可。",
                 "如：主号 / 小号");
-            string? name = owner != null ? await dlg.ShowDialog<string>(owner) : null;
+            string? name = owner != null ? await OverlayDialog.ShowAsync<string>(dlg, owner) : null;
             if (string.IsNullOrWhiteSpace(name))
             {
                 AppendLog("已取消建档（未输入账号名）");

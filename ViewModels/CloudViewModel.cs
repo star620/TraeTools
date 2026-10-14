@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Avalonia.Input.Platform;
@@ -348,7 +348,7 @@ public partial class CloudViewModel : ViewModelBase
                         "通常需要删除旧 fork 后重建。\n\n是否删除旧 fork 并重新部署？\n" +
                         "（选择「保留」则继续使用现有仓库，不会重复创建）",
                         "删除并重建", "保留现有");
-                    bool rebuild = ownerW != null ? await ask.ShowDialog<bool>(ownerW) : true;
+                    bool rebuild = ownerW != null ? await OverlayDialog.ShowAsync<bool>(ask, ownerW) : true;
                     if (rebuild)
                     {
                         AppendLog("正在删除旧 fork 仓库…");
@@ -435,7 +435,7 @@ public partial class CloudViewModel : ViewModelBase
                         "通常是旧 fork 早于源仓库添加 checkin.yml、或 fork 状态异常导致。\n\n" +
                         "是否自动删除旧 fork 并重建？（重建后会自动重新写入凭证）",
                         "删除并重建", "保留现状");
-                    bool rebuild = ownerW != null ? await ask.ShowDialog<bool>(ownerW) : false;
+                    bool rebuild = ownerW != null ? await OverlayDialog.ShowAsync<bool>(ask, ownerW) : false;
                     if (!rebuild)
                     {
                         AppendLog("已跳过重建：可手动删除 fork 后重试，或到源仓库确认 checkin.yml 是否存在。");
@@ -556,7 +556,7 @@ public partial class CloudViewModel : ViewModelBase
             var owner = UiHost.MainWindow;
             if (owner == null) { AppendLog("无法打开输入窗口（主窗口未就绪）"); return; }
             var dlg = new Views.PatInputWindow();
-            bool ok = await dlg.ShowDialog<bool>(owner);
+            bool ok = await OverlayDialog.ShowAsync<bool>(dlg, owner);
             if (!ok || string.IsNullOrWhiteSpace(dlg.PatText)) { AppendLog("已取消 PAT 授权"); return; }
 
             AppendLog("正在校验 PAT…");

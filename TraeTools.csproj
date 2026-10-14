@@ -1,24 +1,49 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- P2-2：升到 net10.0-windows（SDK 10.0.401 已装），为 PublishAot 做准备 -->
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <!-- P2-1：不再使用 WindowsForms（NativeAOT 硬阻塞之一）；登录窗口已拆到独立 TraeTools.LoginHost 项目 -->
+    <!-- 双目标：Windows 桌面（net10.0-windows，AOT/单文件分发）+ Android 手机版（net10.0-android，apk）。
+         Windows 专属能力（DPAPI / 注册表自启 / 托盘 / WebView2 登录宿主 / 客户端切换）一律用
+         TFM 条件或 #if ANDROID 隔离，Android 侧由 Platform/ 下的平台实现替代。
+         注意：Avalonia 12 的 Android 后端仅提供 net10.0-android 资产，故两端统一 .NET 10。 -->
+    <TargetFrameworks>net10.0-windows;net10.0-android</TargetFrameworks>
+    <!-- 多目标项目在非 Windows 系统上还原时，net10.0-windows 也需要 Windows 目标包，
+         开启后可从 NuGet 下载（CI 的 ubuntu android 作业依赖此项；Windows 本机上为无操作） -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- P2-1：不再使用 WindowsForms；登录窗口已拆到独立 TraeTools.LoginHost 项目 -->
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\avalonia-logo.ico</ApplicationIcon>
     <!-- P2-2：Avalonia 编译绑定。反射绑定（ReflectionBinding）在 NativeAOT/裁剪下不可用，
          全部视图已带 x:DataType，#DashboardView 的悬浮命中区也从嵌套类型提升为顶层类型。
          默认开启后新增页面若出现绑定编译错误，需补 x:DataType 而不是回退反射绑定。 -->
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyTitle>TraeTools</AssemblyTitle>
     <Product>TraeTools</Product>
-    <!-- 以下 Version/InformationalVersion 由 ReadVersionFromJson 目标在生成 AssemblyInfo 前从 version.json 自动读取并覆盖。
-         发版时只需修改 version.json，csproj 无需手工同步。 -->
-    <Version>1.0.0</Version>
-    <InformationalVersion>1.0.0</InformationalVersion>
-    <NoWarn>CA1416;MSB3277</NoWarn>
+    <NoWarn>CA1416;MSB3277;XA0121;CS0436</NoWarn>
+  </PropertyGroup>
+
+  <!-- ============ 版本号单一真源 = version.json ============
+       必须在「求值期」（普通 PropertyGroup，而非 Target 内）读取：.NET for Android 生成
+       AndroidManifest（versionName）发生在很靠前的阶段，若只在 Target 里赋值，APK 清单会
+       停留在 csproj 的静态兜底值，与 App 内「关于」显示的版本互相矛盾。
+       发版时只需修改 version.json。 -->
+  <PropertyGroup>
+    <_VJsonRaw Condition="Exists('$(MSBuildProjectDirectory)\version.json')">$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\version.json'))</_VJsonRaw>
+    <_VJsonVer>$([System.Text.RegularExpressions.Regex]::Match('$(_VJsonRaw)', '&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_VJsonVer>
+    <!-- 兜底值仅在 version.json 缺失/异常时生效 -->
+    <Version Condition="'$(_VJsonVer)' != ''">$(_VJsonVer)</Version>
+    <Version Condition="'$(_VJsonVer)' == ''">1.0.0</Version>
+    <InformationalVersion Condition="'$(_VJsonVer)' != ''">$(_VJsonVer)</InformationalVersion>
+    <InformationalVersion Condition="'$(_VJsonVer)' == ''">1.0.0</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- ============ Windows 专属 ============ -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\avalonia-logo.ico</ApplicationIcon>
+    <!-- RuntimeIdentifier 写在这里（按 TFM 条件），而不是由命令行 -r 传入：命令行 -r 是全局属性，
+         会渗入 android TFM 的还原，去找不存在的 Microsoft.NETCore.App.Runtime.Mono.win-x64 而报 NU1102。
+         发布时用 -f net10.0-windows 限定框架即可，无需再传 -r。 -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <!-- 发布瘦身：单文件 + 原生库内嵌自解压 + Brotli 压缩，减小 exe 体积（仅影响发布，不影响普通编译） -->
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
@@ -26,18 +51,52 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <!-- P2-3 正规瘦身：full 裁剪（实测单文件 49.12MB → 23.46MB，启动正常）。
          前置条件已就绪：JSON 全部走源生成（AppJson/AppJsonIndented，无反射序列化）、
-         XAML 全部走编译绑定、ViewLocator 改为显式映射 —— PublishTrimmed/PublishAot 分析 0 条 IL2026/IL3050。 -->
+         XAML 全部走编译绑定、ViewLocator 改为显式映射 —— PublishTrimmed/PublishAot 分析 0 条 IL2026/IL3050。
+         ⚠️ 仅 Windows：Android 目标必须关闭裁剪（见下方 android 组），否则启动即闪退。 -->
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>full</TrimMode>
     <!-- P2-2 NativeAOT（opt-in，默认关闭）。本机实测：0 条 AOT 告警，AOT 产物可正常启动并建窗。
          AOT 产物**不是单文件**，libSkiaSharp / av_libglesv2 / e_sqlite3 / libHarfBuzzSharp / libsodium
          必须与 exe 同目录；分发已改为 zip 整包（release.yml 产出 TraeTools-win-x64.zip），
          应用内更新器（UpdaterService）已改为「下载 zip → SHA-256 校验 → 解包 → 整套文件原子替换 → 重启」。
-         启用方式：dotnet publish TraeTools.csproj -c Release -r win-x64 -p:EnableAot=true -o publish_aot -->
+         启用方式：dotnet publish TraeTools.csproj -c Release -f net10.0-windows -p:EnableAot=true -o publish_aot -->
     <EnableAot Condition="'$(EnableAot)' == ''">false</EnableAot>
     <PublishAot Condition="'$(EnableAot)' == 'true'">true</PublishAot>
   </PropertyGroup>
-  <!-- P2-1：登录宿主是独立项目（有自己的 csproj/bin/obj），主程序不编译、不打包它的源码 -->
+
+  <!-- ============ Android 专属 ============ -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+    <OutputType>Exe</OutputType>
+    <!-- Android 8.0（API 26）：Avalonia 12 Android 后端的下限，也覆盖绝大多数在用机型 -->
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <!-- 包名与 versionCode 是应用的永久身份，如要发布到自己的账号请就地改成自己的标识 -->
+    <ApplicationId>com.traetools.android</ApplicationId>
+    <!-- android:versionName —— 与 version.json 同源，否则「系统-应用信息」与 App 内「关于」会互相矛盾 -->
+    <ApplicationDisplayVersion Condition="'$(_VJsonVer)' != ''">$(_VJsonVer)</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion Condition="'$(_VJsonVer)' == ''">1.0.0</ApplicationDisplayVersion>
+    <!-- android:versionCode —— 必须严格单调递增，否则无法覆盖安装 -->
+    <ApplicationVersion>1</ApplicationVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!-- 关闭 AOT 与链接器：.NET for Android 在 Release 下默认做 LLVM AOT，而本应用仍有反射路径
+         （SQLitePCLRaw provider 初始化、DiagnosticsSupport 等），AOT 下会抛
+         MissingRuntimeArtifactException（表现为“启动即闪退”）。本应用是网络 IO 型工具，
+         AOT 收益有限，稳定性优先，故显式关闭。 -->
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <AOTAssemblies>false</AOTAssemblies>
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <PublishTrimmed>false</PublishTrimmed>
+    <!-- Android 不支持单文件发布，显式关闭以免继承 Windows 组的取值 -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" Condition="'$(TargetFramework)' == 'net10.0-windows'" />
+    <Using Remove="System.Drawing" Condition="'$(TargetFramework)' == 'net10.0-windows'" />
+  </ItemGroup>
+  <!-- P2-1：登录宿主是独立项目（有自己的 csproj/bin/obj），主程序不编译、不打包它的源码。
+       它是 WinForms + WebView2 的 Windows 桌面进程，Android 上不存在对应实现，
+       移动端登录改走「手动粘贴 Token」通道（见 Views/LoginWindow.axaml.cs）。 -->
   <ItemGroup>
     <Compile Remove="TraeTools.LoginHost\**" />
     <None Remove="TraeTools.LoginHost\**" />
@@ -45,6 +104,8 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <AvaloniaResource Include="Styles\**" />
+    <!-- Android 资源（应用图标 / 主题 / 配色），仅 Android 目标参与生成 -->
+    <AndroidResource Include="Resources\**" Condition="'$(TargetFramework)' == 'net10.0-android'" />
   </ItemGroup>
   <ItemGroup>
     <!-- version.json 内嵌为 exe 资源：保证单文件分发/发布时 exe 自带真实版本，无需外置文件同步 -->
@@ -54,21 +115,17 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <!-- 从 version.json 自动同步 Version/InformationalVersion（生成 AssemblyInfo 前执行） -->
-  <Target Name="ReadVersionFromJson" BeforeTargets="GenerateAssemblyInfo;GenerateAssemblyInfoInternal">
-    <PropertyGroup>
-      <_VJsonContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\version.json'))</_VJsonContent>
-      <_VJsonVer>$([System.Text.RegularExpressions.Regex]::Match('$(_VJsonContent)', '&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_VJsonVer>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(_VJsonVer)' != ''">
-      <Version>$(_VJsonVer)</Version>
-      <InformationalVersion>$(_VJsonVer)</InformationalVersion>
-    </PropertyGroup>
-    <Message Text="Version read from version.json: $(_VJsonVer) (applied to Version/InformationalVersion)" Importance="high" />
+  <!-- 版本号同步已在文件顶部「版本号单一真源」PropertyGroup 中于求值期完成，
+       此处仅保留一条构建日志，便于在 CI 输出里确认版本源已生效。 -->
+  <Target Name="ReportVersionSource" BeforeTargets="BeforeBuild">
+    <Message Text="Version read from version.json: $(_VJsonVer) (applied at evaluation time to Version/InformationalVersion/ApplicationDisplayVersion)" Importance="high" />
   </Target>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.2" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
+    <!-- 桌面后端（UsePlatformDetect / StartWithClassicDesktopLifetime）仅 Windows 目标需要；
+         Android 后端由 AvaloniaAndroidApplication 基类自行装配 AppBuilder -->
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" Condition="'$(TargetFramework)' == 'net10.0-windows'" />
+    <PackageReference Include="Avalonia.Android" Version="12.1.2" Condition="'$(TargetFramework)' == 'net10.0-android'" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.2" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
@@ -77,11 +134,13 @@
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.*" />
+    <!-- Android 端 SQLite 原生库（e_sqlite3 的 android arm/arm64/x64/x86 变体）；
+         Windows 端由 bundle_e_sqlite3 自带，不会重复引入。版本跟随 SQLitePCLRaw 传递依赖 -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.android" Version="2.1.*" Condition="'$(TargetFramework)' == 'net10.0-android'" />
     <PackageReference Include="Sodium.Core" Version="1.4.1" />
-    <!-- DPAPI：原先由 Microsoft.WindowsDesktop.App（UseWindowsForms）间接提供，拆掉 WinForms 后需显式引用 -->
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.*" />
+    <!-- DPAPI：原先由 Microsoft.WindowsDesktop.App（UseWindowsForms）间接提供，拆掉 WinForms 后需显式引用。
+         仅 Windows 使用；Android 侧由 Platform/Secrets.Android.cs 走 Keystore + AES-GCM，不依赖本包 -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.*" Condition="'$(TargetFramework)' == 'net10.0-windows'" />
     <!-- P2-1：Microsoft.Web.WebView2（NativeAOT 硬阻塞之二）已随登录窗口移到 TraeTools.LoginHost 项目 -->
   </ItemGroup>
 </Project>
-
-

@@ -3,15 +3,31 @@ using System.IO;
 namespace TraeTools.Services;
 
 /// <summary>
-/// 统一数据根目录（%APPDATA%\TraeTools），收敛历史遗留的 TraeCheckin / TraeSwitch 三个目录。
-/// WebView 缓存与抓包输出保持在 %LOCALAPPDATA%\TraeTools（缓存不进 APPDATA）。
+/// 统一数据根目录（Windows：%APPDATA%\TraeTools；Android：应用私有目录 files/TraeTools），
+/// 收敛历史遗留的 TraeCheckin / TraeSwitch 三个目录。
+/// WebView 缓存与抓包输出保持在 %LOCALAPPDATA%\TraeTools（缓存不进 APPDATA；Android 无此概念）。
 /// 启动时调用 Migrate() 把旧目录数据自动搬入新位置（幂等、失败不阻塞）。
 /// </summary>
 public static class DataPaths
 {
-    /// <summary>根目录：%APPDATA%\TraeTools</summary>
-    public static string Root =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TraeTools");
+    /// <summary>根目录：Windows=%APPDATA%\TraeTools；Android=files/TraeTools（应用私有，其他 App 不可读）</summary>
+    public static string Root
+    {
+        get
+        {
+#if ANDROID
+            // Android 上不能用 SpecialFolder.ApplicationData：该枚举值在 .NET Android 下
+            // 并没有映射到应用私有目录，取值不可靠。统一用 Context.FilesDir。
+            var ctx = Android.App.Application.Context;
+            var files = ctx?.FilesDir?.AbsolutePath;
+            if (string.IsNullOrEmpty(files))
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "TraeTools");
+            return Path.Combine(files, "TraeTools");
+#else
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TraeTools");
+#endif
+        }
+    }
 
     /// <summary>签到配置 config.json。</summary>
     public static string ConfigPath => Path.Combine(Root, "config.json");
@@ -79,6 +95,10 @@ public static class DataPaths
         try
         {
             EnsureDirectories();
+#if ANDROID
+            // Android 是全新平台，不存在历史 TraeCheckin / TraeSwitch 目录，无需迁移
+            return;
+#else
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
@@ -133,6 +153,7 @@ public static class DataPaths
                         Directory.Move(sub, dest);
                 }
             }
+#endif
         }
         catch { /* 迁移失败不阻塞启动 */ }
     }

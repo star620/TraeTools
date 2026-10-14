@@ -1,8 +1,6 @@
-﻿<Window xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="TraeTools.Views.LoginWindow"
-        Title="登录 TRAE 账号" Width="540" Height="500"
-        WindowStartupLocation="CenterOwner"
+        x:Class="TraeTools.Views.LoginWindow" Width="540" Height="500"
         Background="White"
         FontFamily="Microsoft YaHei UI,Segoe UI">
     <Grid RowDefinitions="Auto,*,Auto" Background="White">
@@ -49,5 +47,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Window>
-
+</UserControl>

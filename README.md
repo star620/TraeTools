@@ -2,7 +2,7 @@
 
 > Trae 一体化管理工具：多账号每日签到 · 云端自动签到 · 账号快速切换 · 用量统计
 
-TraeTools 是对 **TRAE-Checkin** 的重构版，并集成了 **Trea-Switch** 的账号切换能力，用 Avalonia 重写为现代化桌面应用（.NET 9）。一个工具覆盖 Trae 账号的「登录 → 签到 → 切换 → 用量查看 → 云端托管」全流程。
+TraeTools 是对 **TRAE-Checkin** 的重构版，并集成了 **Trea-Switch** 的账号切换能力，用 Avalonia 重写为现代化客户端（.NET 10）。**一套代码同时产出 Windows 桌面版与 Android 手机版**，覆盖 Trae 账号的「登录 → 签到 → 切换 → 用量查看 → 云端托管」全流程。
 
 ### 气死我了，怎么老是给我爆9074
 
@@ -29,22 +29,60 @@ TraeTools 是对 **TRAE-Checkin** 的重构版，并集成了 **Trea-Switch** �
 
 ## 快速开始
 
-> **macOS 用户看这里**：macOS 原生版 TraeBar（菜单栏常驻多账号自动签到，Swift/AppKit 实现）在本仓库的 [`macos`](https://github.com/star620/TraeTools/tree/macos) 分支独立维护与发布，版本 tag 为 `macos-v*`，发布产物见 [Releases](https://github.com/star620/TraeTools/releases)。本分支（main）仅维护 Windows 版。
+> **macOS 用户看这里**：macOS 原生版 TraeBar（菜单栏常驻多账号自动签到，Swift/AppKit 实现）在本仓库的 [`macos`](https://github.com/star620/TraeTools/tree/macos) 分支独立维护与发布，版本 tag 为 `macos-v*`，发布产物见 [Releases](https://github.com/star620/TraeTools/releases)。本分支（main）维护 **Windows 版与 Android 版**。
 
 ### 方式一：直接使用
-在 [Releases](https://github.com/star620/TraeTools/releases) 下载最新版运行（Windows，需 .NET 9 桌面运行时）。
+在 [Releases](https://github.com/star620/TraeTools/releases) 下载最新版运行（Windows 需 .NET 10 桌面运行时；Android 直接安装 APK，需 Android 8.0+）。
 
 ### 方式二：源码编译
 
-需要 **.NET 9 SDK**：
+需要 **.NET 10 SDK**：
 
 ```bash
 git clone https://github.com/star620/TraeTools.git
 cd TraeTools
-dotnet build -c Release
+
+# Windows 桌面版
+dotnet build TraeTools.csproj -c Release -f net10.0-windows
+
+# Android 手机版（需先安装 Android 工作负载）
+dotnet workload install android
+dotnet build TraeTools.csproj -c Release -f net10.0-android
 ```
 
-产物位于 `bin/Release/net9.0-windows/TraeTools.exe`。
+产物分别位于 `bin/Release/net10.0-windows/`（`TraeTools.exe`）与 `bin/Release/net10.0-android/`（`*.apk`）。
+
+> 项目是双目标（`net10.0-windows;net10.0-android`），**编译时必须用 `-f` 限定框架**，否则会同时构建两端。在非 Windows 系统上构建 android 目标时，`EnableWindowsTargeting` 已在 csproj 中开启，无需额外参数。
+
+## Android 版
+
+Android 与 Windows **共用同一套** `ViewModels/` `Services/` `Views/`（Avalonia 单视图模式），平台差异统一收敛在 `Platform/` 目录与 TFM 条件编译中，不存在第二套业务代码。
+
+### 功能差异
+
+| 能力 | Windows | Android |
+|---|---|---|
+| 多账号每日签到 / 自动签到 | ✅ | ✅（进程存活期间到点执行） |
+| 云端签到部署（GitHub Actions） | ✅ | ✅ |
+| 用量统计 / 仪表盘 / 账号资料 | ✅ | ✅ |
+| 账号切换（vault 建档 / 冷切换） | ✅ 直接操作本地客户端 | ⚠️ 手机端无本地 Trae 客户端，页面仅作展示 |
+| 登录方式 | ✅ 内嵌浏览器（WebView2）自动取凭证 | ✅ 手动粘贴 Token / 会话 Cookie |
+| 开机自启 | ✅ 注册表 `Run` 项 | ❌ 系统无等价机制，已降级为无操作 |
+| 应用内自动更新 | ✅ 下载 zip 整包并整套替换 | ⚠️ 引导至 Release 页下载 APK 覆盖安装 |
+| 凭证加密 | DPAPI（当前用户） | Android Keystore（RSA-2048 包裹 AES-256-GCM 数据密钥） |
+
+### 实现要点
+
+- **多目标而非分叉**：`TraeTools.csproj` 改为 `<TargetFrameworks>net10.0-windows;net10.0-android</TargetFrameworks>`。Windows 侧的 AOT / 裁剪 / 单文件 / `RuntimeIdentifier` 全部保留在 `net10.0-windows` 条件组内，**现有 Windows 发布流程零改动**（`release.yml` 仅追加 `-f net10.0-windows` 以消除多目标歧义）。
+- **对话框全部改为 `UserControl`**：Android 走 `ISingleViewApplicationLifetime`，此时 `new Window()` 会抛 `NotSupportedException`。新增 `Views/OverlayDialog.cs` 作为双模宿主——桌面端包一层 `DialogHostWindow`，Android 端挂到 `MainView` 的全屏覆盖层并用 `TaskCompletionSource` 模拟模态；所有弹窗调用点由 `ShowDialog` 改为 `OverlayDialog.ShowAsync`。
+- **Android 目标显式关闭 AOT / 裁剪 / 链接器**：.NET for Android 在 Release 下默认启用 LLVM AOT，会因 `SQLitePCLRaw` 等反射路径抛 `MissingRuntimeArtifactException`（表现为「启动即闪退」）。本应用是网络 IO 型工具，稳定性优先。
+- **版本号单一真源**：`version.json` 的读取从 `Target` 上移到**求值期** `PropertyGroup`，否则 `AndroidManifest` 的 `versionName` 会停在静态兜底值，与 App 内「关于」显示的版本互相矛盾。
+- **崩溃可见**：`Platform/CrashLog.cs` 安装全局异常钩子（含 `AndroidEnvironment.UnhandledExceptionRaiser`），异常落盘并在下次启动时弹出原生错误页 `CrashReportActivity`，避免手机端「闪退且无日志」。
+
+### 构建产物与 CI
+
+- APK 产物位于 `bin/Release/net10.0-android/`；Release 默认使用调试密钥签名，正式分发请自行配置 keystore（`AndroidKeyStore` / `AndroidSigningKeyStore`）。
+- `.github/workflows/ci.yml` 已拆为 `build-windows` 与 `build-android` 两个作业，后者在 Ubuntu 上安装 Android 工作负载编译 APK 并上传为构建产物。
 
 ## 使用指南
 
@@ -83,8 +121,8 @@ dotnet build -c Release
 
 ## 开发者
 
-- 技术栈：Avalonia 12 / .NET 9 / CommunityToolkit.Mvvm / Sodium.Core / WebView2
-- 目录：`ViewModels/` 页面逻辑、`Services/` 网络与领域服务、`Views/` 界面、`Models/` 数据模型
+- 技术栈：Avalonia 12 / .NET 10 / CommunityToolkit.Mvvm / Sodium.Core / WebView2（仅 Windows 登录宿主）
+- 目录：`ViewModels/` 页面逻辑、`Services/` 网络与领域服务、`Views/` 界面、`Models/` 数据模型、`Platform/` 平台差异实现（加密 / 路径 / 日志 / 崩溃 / 浏览器 / 对话框宿主）
 - 行为默认不对外请求官方非公开接口之外的能力；用量/积分接口为逆向网页接口，字段随官方可能变化，代码均做容错解析
 
 ## 免责声明

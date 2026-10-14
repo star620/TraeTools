@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using TraeCheckin;
 using TraeTools.Models;
 using TraeTools.Services.Avatar;
+using TraeTools.Views;
 
 namespace TraeTools.ViewModels;
 
@@ -634,7 +635,7 @@ public partial class DashboardViewModel : ViewModelBase
                       ?? cfg?.Accounts.FirstOrDefault();
             if (cfg == null || owner == null || acc == null) return;
             var dlg = new Views.LoginWindow(acc);
-            bool ok = await dlg.ShowDialog<bool>(owner);
+            bool ok = await OverlayDialog.ShowAsync<bool>(dlg, owner);
             if (ok)
             {
                 try { cfg.Save(); } catch { /* 忽略保存失败 */ }

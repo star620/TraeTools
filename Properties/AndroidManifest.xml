@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="auto">
+  <uses-permission android:name="android.permission.INTERNET" />
+  <!-- Android 11（API 30）起有「包可见性」限制。startActivity 走隐式 Intent 本身不受限，
+       但个别定制 ROM 会拦截，且未来需要用 resolveActivity 做兜底判断时必须能看见浏览器。
+       因此显式声明 http/https 的 VIEW 查询意图，让本应用始终能解析到系统浏览器。
+       对应代码：Platform/BrowserLauncher.cs（授权 GitHub / 打开 trae.cn 等按钮自动打开浏览器）。 -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <data android:scheme="https" />
+    </intent>
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <data android:scheme="http" />
+    </intent>
+  </queries>
+  <application android:label="TraeTools"
+               android:icon="@mipmap/ic_launcher"
+               android:roundIcon="@mipmap/ic_launcher_round"
+               android:theme="@style/MyTheme.NoActionBar"
+               android:supportsRtl="true" />
+</manifest>

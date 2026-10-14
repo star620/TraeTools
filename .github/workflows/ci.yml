@@ -5,12 +5,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -22,12 +23,41 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Build (Release)
-        run: dotnet build TraeTools.csproj -c Release --nologo
+      # 主程序现在是双目标（net10.0-windows;net10.0-android），本作业只负责桌面端：
+      # 用 -f 限定框架，否则会连带构建 android TFM 而本作业未安装 Android workload
+      - name: Build Windows (Release)
+        run: dotnet build TraeTools.csproj -c Release -f net10.0-windows --nologo
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: trae-tools-build
+          name: trae-tools-build-windows
           path: bin/Release/net10.0-windows/
+          if-no-files-found: error
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Android workload：含 Microsoft.Android SDK / OpenJDK 等构建依赖（首次安装约 5-10 分钟）
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      # EnableWindowsTargeting：双目标项目还原时会一并还原 net10.0-windows，
+      # ubuntu 上必须允许下载 Windows 目标包，否则报 NETSDK1100
+      - name: Build Android (Release)
+        run: dotnet build TraeTools.csproj -c Release -f net10.0-android -p:EnableWindowsTargeting=true --nologo
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: trae-tools-android-apk
+          path: bin/Release/net10.0-android/*.apk
           if-no-files-found: error

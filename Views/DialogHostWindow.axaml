@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TraeTools.Views.DialogHostWindow"
+        Title=" "
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" ShowInTaskbar="False"
+        MaxWidth="660" MaxHeight="760"
+        Background="{DynamicResource CardBgBrush}"
+        FontFamily="Inter,Microsoft YaHei UI,Segoe UI">
+    <!-- 桌面端对话框承载窗口。所有对话框内容都实现为 UserControl（Android 单视图平台
+         不允许创建 Window），桌面端由本窗口包一层后 ShowDialog。 -->
+    <ScrollViewer MaxHeight="700" HorizontalScrollBarVisibility="Disabled">
+        <ContentControl x:Name="DialogHost" />
+    </ScrollViewer>
+</Window>
